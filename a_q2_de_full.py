@@ -93,14 +93,14 @@ def violation_grid(x, nphi=72, nz=9, ns=101):
 
     B = P[None, :, :] - M[:, None, :]
     B2 = np.sum(B * B, axis=2)
-
-    cross = np.cross(A[:, None, :], B)
-    d = np.sqrt(np.sum(cross * cross, axis=2) / B2)
     lam = np.sum(B * A[:, None, :], axis=2) / B2
+    lam_c = np.clip(lam, 0.0, 1.0)
+    dseg = np.linalg.norm(
+        A[:, None, :] - lam_c[:, :, None] * B,
+        axis=2
+    )
 
-    max_d = d.max(axis=1)
-    min_lam = lam.min(axis=1)
-    max_lam = lam.max(axis=1)
+    max_dseg = dseg.max(axis=1)
 
     # -------------------------
     # two tangent generators
@@ -127,20 +127,15 @@ def violation_grid(x, nphi=72, nz=9, ns=101):
 
     Bg = Pg - M[:, None, None, :]
     B2g = np.sum(Bg * Bg, axis=3)
-
-    cross_g = np.cross(A[:, None, None, :], Bg)
-    dg = np.sqrt(np.sum(cross_g * cross_g, axis=3) / B2g)
     lamg = np.sum(Bg * A[:, None, None, :], axis=3) / B2g
+    lamg_c = np.clip(lamg, 0.0, 1.0)
+    dseg_g = np.linalg.norm(
+        A[:, None, None, :] - lamg_c[:, :, :, None] * Bg,
+        axis=3
+    )
 
-    max_d = np.maximum(max_d, dg.max(axis=(1, 2)))
-    min_lam = np.minimum(min_lam, lamg.min(axis=(1, 2)))
-    max_lam = np.maximum(max_lam, lamg.max(axis=(1, 2)))
-
-    violation = np.maximum.reduce([
-        max_d - R_SMOKE,
-        -min_lam,
-        max_lam - 1.0
-    ])
+    max_dseg = np.maximum(max_dseg, dseg_g.max(axis=(1, 2)))
+    violation = max_dseg - R_SMOKE
 
     return s, violation
 
@@ -192,16 +187,11 @@ def violation_scalar(x, s, nphi=72, nz=9):
 
     B = P - M
     B2 = np.sum(B * B, axis=1)
-
-    cross = np.cross(A[None, :], B)
-    d = np.sqrt(np.sum(cross * cross, axis=1) / B2)
     lam = (B @ A) / B2
+    lam_c = np.clip(lam, 0.0, 1.0)
+    dseg = np.linalg.norm(A[None, :] - lam_c[:, None] * B, axis=1)
 
-    return max(
-        float(d.max() - R_SMOKE),
-        float(-lam.min()),
-        float(lam.max() - 1.0)
-    )
+    return float(dseg.max() - R_SMOKE)
 
 
 def duration_and_min_violation(x, nphi=72, nz=9, ns=101):
@@ -354,10 +344,10 @@ if __name__ == "__main__":
     # Optional last narrow refinement around the best point found above.
     VF0, th0, td0, tau0 = fine.x
     ultra_bounds = [
-        (max(139.8, VF0 - 0.2), 140.0),
-        (max(0.08, th0 - 0.02), min(0.10, th0 + 0.02)),
-        (max(0.70, td0 - 0.30), min(1.10, td0 + 0.30)),
-        (max(0.0, tau0 - 0.10), min(0.15, tau0 + 0.10)),
+        (max(70.0, VF0 - 0.5), min(140.0, VF0 + 0.5)),
+        (max(-np.pi, th0 - 0.03), min(np.pi, th0 + 0.03)),
+        (max(0.0, td0 - 0.5), min(MISSILE_HIT_TIME, td0 + 0.5)),
+        (max(0.0, tau0 - 0.3), min(TAU_MAX, tau0 + 0.3)),
     ]
 
     ultra_objective = make_objective(

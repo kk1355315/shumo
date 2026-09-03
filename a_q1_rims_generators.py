@@ -62,12 +62,12 @@ def violation(s,nphi=360,nz=41):
     A=C-M
     B=P-M
     B2=np.einsum("ij,ij->i",B,B)
-    cr=np.cross(A[None,:],B)
-    d=np.sqrt(np.einsum("ij,ij->i",cr,cr)/B2)
     lam=(B@A)/B2
+    lam_c=np.clip(lam,0.0,1.0)
+    dseg=np.linalg.norm(A[None,:]-lam_c[:,None]*B,axis=1)
 
-    # <=0 iff all silhouette candidates satisfy d<=R and 0<=lambda<=1
-    return max(d.max()-R_SMOKE,-lam.min(),lam.max()-1.0)
+    # <=0 iff the smoke sphere intersects every missile-target segment
+    return dseg.max()-R_SMOKE
 
 def solve(nphi=360,nz=41,nscan=400):
     xs=np.linspace(0,T_SMOKE,nscan+1)
